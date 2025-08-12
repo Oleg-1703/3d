@@ -61,3 +61,4 @@ env/
 # System files
 .DS_Store
 Thumbs.db
+Tracking-Anything-with-DEVA/saves/*.pth*

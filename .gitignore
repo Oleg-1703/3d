@@ -62,3 +62,4 @@ env/
 .DS_Store
 Thumbs.db
 Tracking-Anything-with-DEVA/saves/*.pth*
+Tracking-Anything-with-DEVA/saves/DEVA-propagation.pth.1

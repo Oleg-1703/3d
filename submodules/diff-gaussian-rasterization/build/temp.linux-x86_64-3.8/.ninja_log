@@ -1,0 +1,11 @@
+# ninja log v5
+1	3375	1754943855682228463	/root/autodl-tmp/autodl-/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/forward.o	f828ea539a2ed111
+1	3408	1754943855714230388	/root/autodl-tmp/autodl-/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/backward.o	89ca50b3da48b704
+0	8283	1754943860586523263	/root/autodl-tmp/autodl-/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/rasterizer_impl.o	dfe62a49b34797ed
+1	26381	1754943878667607289	/root/autodl-tmp/autodl-/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/ext.o	818900591f792ffc
+1	41378	1754943893676503820	/root/autodl-tmp/autodl-/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/rasterize_points.o	8eec2bfab6cbbb20
+4	3498	1754974257165801083	/root/autodl-tmp/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/forward.o	a9baf73247242f8c
+5	3677	1754974257345846732	/root/autodl-tmp/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/backward.o	33d7ec315183b1a0
+4	8477	1754974262143062305	/root/autodl-tmp/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/cuda_rasterizer/rasterizer_impl.o	abe793314d08d7a5
+5	27324	1754974280975820935	/root/autodl-tmp/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/ext.o	f33f4683bbe36d8f
+5	42183	1754974295847565024	/root/autodl-tmp/3d_v2/submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-3.8/rasterize_points.o	cf936cdda3b00f07

@@ -1,0 +1,1 @@
+Namespace(data_device='cuda', eval=False, images='images', model_path='./output/5191c093-e', n_views=100, num_classes=256, object_path='object_mask', random_init=False, resolution=-1, sh_degree=3, source_path='/root/3d_v2/3d_v2', train_split=False, white_background=False)

@@ -1,0 +1,14 @@
+{
+    "model_path": "output/default",
+    "source_path": "data/default",
+    "eval": true,
+    "iterations": 30000,
+    "test_iterations": [7000, 30000],
+    "save_iterations": [7000, 30000],
+    "checkpoint_iterations": [],
+    "start_checkpoint": null,
+    "debug_from": -1,
+    "detect_anomaly": false,
+    "warmup_length": 1000,
+    "use_wandb": false
+}

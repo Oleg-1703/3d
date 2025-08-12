@@ -1,0 +1,4 @@
+# ninja log v5
+1	11597	1754943911565568599	/root/autodl-tmp/autodl-/3d_v2/submodules/simple-knn/build/temp.linux-x86_64-3.8/simple_knn.o	ce2508a5dd6ef51
+1	26155	1754943926110431381	/root/autodl-tmp/autodl-/3d_v2/submodules/simple-knn/build/temp.linux-x86_64-3.8/ext.o	9e0049cd29de213b
+0	42494	1754943942459398122	/root/autodl-tmp/autodl-/3d_v2/submodules/simple-knn/build/temp.linux-x86_64-3.8/spatial.o	83c063fde04b644f

@@ -1,0 +1,63 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+.venv/
+env/
+
+# Model weights
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.tflite
+*.pb
+*.h5
+*.keras
+
+# Large datasets & binary files
+*.npz
+*.npy
+*.csv
+*.tsv
+*.parquet
+*.feather
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+*.bz2
+
+# Image & video files
+*.jpg
+*.bin
+*.JPG
+*.jpeg
+*.png
+*.bmp
+*.gif
+*.tiff
+*.webp
+*.mp4
+*.avi
+*.mov
+*.mkv
+
+# Logs & temp files
+*.log
+*.tmp
+*.temp
+*.bak
+*.swp
+
+# Jupyter notebook checkpoints
+.ipynb_checkpoints/
+
+# System files
+.DS_Store
+Thumbs.db

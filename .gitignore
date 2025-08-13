@@ -63,3 +63,12 @@ env/
 Thumbs.db
 Tracking-Anything-with-DEVA/saves/*.pth*
 Tracking-Anything-with-DEVA/saves/DEVA-propagation.pth.1
+
+submodules/diff-gaussian-rasterization/build/lib.linux-x86_64-cpython-38/
+submodules/diff-gaussian-rasterization/build/temp.linux-x86_64-cpython-38/
+submodules/simple-knn/build/lib.linux-x86_64-cpython-38/
+submodules/simple-knn/build/temp.linux-x86_64-cpython-38/
+Tracking-Anything-with-DEVA/saves/mobile_sam.pt.2
+bfg.jar
+..bfg-report/
+Tracking-Anything-with-DEVA/output_text_seg/

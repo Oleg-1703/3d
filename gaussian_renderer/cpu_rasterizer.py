@@ -1,3 +1,4 @@
+import math
 # CPU-based Gaussian rasterizer
 # Adapted from thomasantony/splat (https://github.com/thomasantony/splat)
 
@@ -48,8 +49,8 @@ class CPUGaussian:
         pos_v = view_matrix @ pos_w
         depth = pos_v[2]
 
-        focal_x = viewpoint_camera.image_width / (2 * viewpoint_camera.tanfovx)
-        focal_y = viewpoint_camera.image_height / (2 * viewpoint_camera.tanfovy)
+        focal_x = viewpoint_camera.image_width / (2 * math.tan(viewpoint_camera.FoVx * 0.5))
+        focal_y = viewpoint_camera.image_height / (2 * math.tan(viewpoint_camera.FoVy * 0.5))
         
         tx, ty, tz = pos_v[0], pos_v[1], pos_v[2]
         if tz < 1e-5: tz = 1e-5
@@ -136,8 +137,8 @@ def rasterize_gaussians_cpu(gaussians, viewpoint_camera, bg_color, pipe_args):
         if depth_gau < viewpoint_camera.znear or depth_gau > viewpoint_camera.zfar:
             continue
 
-        fx = viewpoint_camera.image_width / (2 * viewpoint_camera.tanfovx)
-        fy = viewpoint_camera.image_height / (2 * viewpoint_camera.tanfovy)
+        fx = viewpoint_camera.image_width / (2 * math.tan(viewpoint_camera.FoVx * 0.5))
+        fy = viewpoint_camera.image_height / (2 * math.tan(viewpoint_camera.FoVy * 0.5))
         cx = viewpoint_camera.image_width / 2
         cy = viewpoint_camera.image_height / 2
 

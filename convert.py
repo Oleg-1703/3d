@@ -3,7 +3,7 @@
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
 # All rights reserved.
 #
-# This software is free for non-commercial, research and evaluation use
+# This software is free for non-commercial, research and evaluation use 
 # under the terms of the LICENSE.md file.
 #
 # For inquiries contact  george.drettakis@inria.fr
@@ -53,13 +53,11 @@ if not args.skip_matching:
         exit(exit_code)
 
     ### Bundle adjustment
-    # The default Mapper tolerance is unnecessarily large,
-    # decreasing it speeds up bundle adjustment steps.
+    # Removed problematic --Mapper.ba_global_function_tolerance option for compatibility
     mapper_cmd = (colmap_command + " mapper \
         --database_path " + args.source_path + "/distorted/database.db \
         --image_path "  + args.source_path + "/input \
-        --output_path "  + args.source_path + "/distorted/sparse \
-        --Mapper.ba_global_function_tolerance=0.000001")
+        --output_path "  + args.source_path + "/distorted/sparse")
     exit_code = os.system(mapper_cmd)
     if exit_code != 0:
         logging.error(f"Mapper failed with code {exit_code}. Exiting.")
@@ -74,7 +72,7 @@ img_undist_cmd = (colmap_command + " image_undistorter \
     --output_type COLMAP")
 exit_code = os.system(img_undist_cmd)
 if exit_code != 0:
-    logging.error(f"Mapper failed with code {exit_code}. Exiting.")
+    logging.error(f"Image undistorter failed with code {exit_code}. Exiting.")
     exit(exit_code)
 
 files = os.listdir(args.source_path + "/sparse")

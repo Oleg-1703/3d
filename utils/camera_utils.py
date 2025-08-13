@@ -14,6 +14,7 @@ import numpy as np
 from utils.general_utils import PILtoTorch
 from utils.graphics_utils import fov2focal
 import torch
+from PIL import Image
 
 WARNED = False
 
@@ -47,11 +48,43 @@ def loadCam(args, id, cam_info, resolution_scale):
     if resized_image_rgb.shape[1] == 4:
         loaded_mask = resized_image_rgb[3:4, ...]
 
+    # Исправление для обработки масок объектов
+    objects_tensor = None
+    if cam_info.objects is not None:
+        if isinstance(cam_info.objects, Image.Image):
+            # Конвертируем PIL Image в numpy массив, затем в torch tensor
+            objects_array = np.array(cam_info.objects)
+            
+            # Если это RGB изображение, берем только один канал (обычно все каналы одинаковые для масок)
+            if len(objects_array.shape) == 3:
+                objects_array = objects_array[:, :, 0]
+            
+            # Изменяем размер маски объектов под разрешение камеры
+            if objects_array.shape[:2] != resolution[::-1]:  # PIL resolution is (W, H), numpy is (H, W)
+                objects_pil = Image.fromarray(objects_array)
+                objects_pil = objects_pil.resize(resolution, Image.NEAREST)
+                objects_array = np.array(objects_pil)
+            
+            # Конвертируем в torch tensor с правильным типом
+            objects_tensor = torch.from_numpy(objects_array.astype(np.int32))
+            
+        elif isinstance(cam_info.objects, np.ndarray):
+            # Если уже numpy массив
+            objects_tensor = torch.from_numpy(cam_info.objects.astype(np.int32))
+        else:
+            # Если что-то другое, пытаемся конвертировать
+            try:
+                objects_array = np.array(cam_info.objects, dtype=np.int32)
+                objects_tensor = torch.from_numpy(objects_array)
+            except:
+                print(f"Warning: Could not convert objects for camera {id}, using None")
+                objects_tensor = None
+
     return Camera(colmap_id=cam_info.uid, R=cam_info.R, T=cam_info.T, 
                   FoVx=cam_info.FovX, FoVy=cam_info.FovY, 
                   image=gt_image, gt_alpha_mask=loaded_mask,
                   image_name=cam_info.image_name, uid=id, data_device=args.data_device,
-                  objects=torch.from_numpy(np.array(cam_info.objects)))
+                  objects=objects_tensor)
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
     camera_list = []

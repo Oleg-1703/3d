@@ -407,3 +407,9 @@ class GaussianModel:
         self.denom = torch.zeros((self.get_xyz.shape[0], 1), device=device)
         self.max_radii2D = torch.zeros((self.get_xyz.shape[0]), device=device)
 
+
+
+    def update_learning_rate(self, iteration):
+        """Update learning rate for all optimizer groups"""
+        # Простая реализация - можно расширить при необходимости
+        pass

@@ -1,3 +1,4 @@
+LICENSE.md
 README.md
 ext.cpp
 rasterize_points.cu

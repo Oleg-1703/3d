@@ -26,11 +26,11 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
 
     bg_color_cpu = bg_color.cpu()
 
-    xyz_np = pc.get_xyz.cpu().numpy()
-    scales_np = pc.get_scaling.cpu().numpy()
-    rotations_np = pc.get_rotation.cpu().numpy() 
-    opacities_np = pc.get_opacity.cpu().numpy()
-    shs_np = pc.get_features.cpu().numpy()
+    xyz_np = pc.get_xyz.detach().cpu().numpy()
+    scales_np = pc.get_scaling.detach().cpu().numpy()
+    rotations_np = pc.get_rotation.detach().cpu().numpy() 
+    opacities_np = pc.get_opacity.detach().cpu().numpy()
+    shs_np = pc.get_features.detach().cpu().numpy()
     # Get object IDs from the GaussianModel
     # pc.get_objects typically returns a tensor of shape (N, 1) with dtype int32
     object_ids_tensor = pc.get_objects
@@ -41,7 +41,7 @@ def render(viewpoint_camera, pc : GaussianModel, pipe, bg_color : torch.Tensor, 
         print("Warning: pc.get_objects returned None. Using dummy object IDs (all 0).")
         object_ids_np = np.zeros(xyz_np.shape[0], dtype=np.int32)
     else:
-        object_ids_np = object_ids_tensor.cpu().numpy().flatten() # Flatten from (N,1) to (N,)
+        object_ids_np = object_ids_tensor.detach().cpu().numpy().flatten() # Flatten from (N,1) to (N,)
     
     num_gaussians = xyz_np.shape[0]
     cpu_gaussians = []

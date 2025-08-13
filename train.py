@@ -30,7 +30,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians.training_setup(opt)
     num_classes = dataset.num_classes
     print("Num classes: ",num_classes)
-    classifier = torch.nn.Conv2d(gaussians.num_objects, num_classes, kernel_size=1)
+    classifier = torch.nn.Conv2d(1, num_classes, kernel_size=1)
     cls_criterion = torch.nn.CrossEntropyLoss(reduction='none')
     cls_optimizer = torch.optim.Adam(classifier.parameters(), lr=5e-4)
     classifier.cuda()
@@ -85,13 +85,26 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
 
         # Object Loss
         gt_obj = viewpoint_cam.objects.cuda().long()
-        logits = classifier(objects)
-        loss_obj = cls_criterion(logits.unsqueeze(0), gt_obj.unsqueeze(0)).squeeze().mean()
+        logits = classifier(objects.float().cuda().unsqueeze(0).unsqueeze(0))
+        # Отладочная информация о размерностях
+        print(f'logits shape: {logits.shape}')
+        print(f'gt_obj shape: {gt_obj.shape}')
+        
+        # logits должен быть [batch, classes, H, W], gt_obj должен быть [batch, H, W]
+        if len(logits.shape) == 4:
+            # logits уже правильной формы [1, 256, H, W]
+            target = gt_obj.unsqueeze(0)  # [1, H, W]
+        else:
+            # Если что-то не так с размерностями
+            logits = logits.unsqueeze(0)
+            target = gt_obj.unsqueeze(0)
+            
+        loss_obj = cls_criterion(logits, target).mean()
         loss_obj = loss_obj / torch.log(torch.tensor(num_classes))  # normalize to (0,1)
 
         # Loss
         gt_image = viewpoint_cam.original_image.cuda()
-        Ll1 = l1_loss(image, gt_image)
+        Ll1 = l1_loss(render_pkg["render"].cuda(), gt_image)
 
         loss_obj_3d = None
         if iteration % opt.reg3d_interval == 0:
@@ -99,9 +112,9 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
             logits3d = classifier(gaussians._objects_dc.permute(2,0,1))
             prob_obj3d = torch.softmax(logits3d,dim=0).squeeze().permute(1,0)
             loss_obj_3d = loss_cls_3d(gaussians._xyz.squeeze().detach(), prob_obj3d, opt.reg3d_k, opt.reg3d_lambda_val, opt.reg3d_max_points, opt.reg3d_sample_size)
-            loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image)) + loss_obj + loss_obj_3d
+            loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(render_pkg["render"].cuda(), gt_image)) + loss_obj + loss_obj_3d
         else:
-            loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(image, gt_image)) + loss_obj
+            loss = (1.0 - opt.lambda_dssim) * Ll1 + opt.lambda_dssim * (1.0 - ssim(render_pkg["render"].cuda(), gt_image)) + loss_obj
 
         loss.backward()
         iter_end.record()

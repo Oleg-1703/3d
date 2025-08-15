@@ -96,27 +96,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, objects_fol
         image_name = os.path.basename(image_path).split(".")[0]
         image = Image.open(image_path) if os.path.exists(image_path) else None
         object_path = os.path.join(objects_folder, image_name + '.png')
-        # ИСПРАВЛЕННАЯ ЗАГРУЗКА ОБЪЕКТНЫХ МАСОК
-        if os.path.exists(object_path):
-            # Загружаем маску как numpy array с правильными размерами
-            object_mask_pil = Image.open(object_path)
-            
-            # Убеждаемся что размеры совпадают с изображением
-            if image is not None and object_mask_pil.size != image.size:
-                print(f"⚠️  Ресайз маски {image_name}: {object_mask_pil.size} -> {image.size}")
-                object_mask_pil = object_mask_pil.resize(image.size, Image.NEAREST)
-            
-            # Конвертируем в numpy array
-            objects = np.array(object_mask_pil)
-            
-            # Убеждаемся что это бинарная маска [0, 1]
-            if objects.max() > 1:
-                objects = (objects > 0).astype(np.uint8)
-            
-            print(f"✓ Маска загружена {image_name}: shape={objects.shape}, unique={np.unique(objects)}")
-        else:
-            print(f"❌ Маска не найдена: {object_path}")
-            objects = None
+        objects = Image.open(object_path) if os.path.exists(object_path) else None
 
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, image=image,
                               image_path=image_path, image_name=image_name, width=width, height=height, objects=objects)

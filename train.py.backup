@@ -20,7 +20,7 @@ from arguments import ModelParams, PipelineParams, OptimizationParams
 from scene import Scene, GaussianModel
 from utils.general_utils import safe_state
 from gaussian_renderer import render
-from utils.loss_utils import l1_loss, ssim, loss_cls_3d
+from utils.loss_utils import l1_loss, ssim
 from utils.lpipsloss import lpips
 import lpips as lpips_eval
 
@@ -149,15 +149,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     gaussians.training_setup(opt)
     
     # Убеждаемся что модель на правильном устройстве
+    gaussians = gaussians.to(device)
     
     # Создаем классификатор для сегментации
-    # ПРАВИЛЬНЫЙ КЛАССИФИКАТОР для Gaussian Grouping сегментации
-    classifier = torch.nn.Conv2d(1, dataset.num_classes, kernel_size=1).to(device)
-    torch.nn.init.xavier_uniform_(classifier.weight, gain=0.01)
-    torch.nn.init.constant_(classifier.bias, 0.0)
-    cls_criterion = torch.nn.CrossEntropyLoss(reduction='none')
-    cls_optimizer = torch.optim.Adam(classifier.parameters(), lr=5e-4)
-    print(f"Классификатор создан: 1 -> {dataset.num_classes} классов")
+    classifier = SegmentationNetwork(feature_size=3, num_classes=dataset.num_classes).to(device)
+    classifier_optimizer = torch.optim.Adam(classifier.parameters(), lr=0.001)
     
     # Фон
     bg_color = [1, 1, 1] if dataset.white_background else [0, 0, 0]
@@ -225,136 +221,49 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
         gt_image = viewpoint_cam.original_image.to(device)
         Ll1 = l1_loss(image, gt_image)
         
-        # ПРАВИЛЬНАЯ СЕГМЕНТАЦИЯ GAUSSIAN GROUPING
+        # Потеря сегментации (если есть ground truth)
+        loss_obj_3d = torch.tensor(0.0, device=device)
         
-        # Object Loss - как в оригинальном train.py
         if hasattr(viewpoint_cam, 'objects') and viewpoint_cam.objects is not None:
             try:
-                # Получаем gt маски объектов  
                 gt_obj = viewpoint_cam.objects.to(device).long()
                 
-                # objects из рендера должен быть [C, H, W] где C - каналы объектов
-                if "render_object" in render_pkg:
-                    objects = render_pkg["render_object"]  # [C, H, W]
-                    
-                    print(f'objects shape: {objects.shape}, gt_obj shape: {gt_obj.shape}')
-                    
-                    # Преобразуем objects для классификатора
-                    # Классификатор ожидает [batch, 1, H, W]
-                    if objects.dim() == 3:  # [C, H, W]
-                        # Берем первый канал как объектную карту
-                        objects_input = objects[0:1].unsqueeze(0)  # [1, 1, H, W]
-                        objects_input = (objects_input - objects_input.mean()) / (objects_input.std() + 1e-8)
-
-                    elif objects.dim() == 2:  # [H, W] 
-                        objects_input = objects.unsqueeze(0).unsqueeze(0)  # [1, 1, H, W]
-                    else:
-                        objects_input = objects.float()
-                    
-                    # Убеждаемся что размеры совпадают
-                    if objects_input.shape[-2:] != gt_obj.shape[-2:]:
-                        # Ресайзим gt_obj к размеру objects
-                        gt_obj = torch.nn.functional.interpolate(
-                            gt_obj.float().unsqueeze(0).unsqueeze(0),
-                            size=objects_input.shape[-2:],
-                            mode='nearest'
-                        ).squeeze().long()
-                    
-                    # Классификация объектов
-                    logits = classifier(objects_input.float())  # [1, num_classes, H, W]
-                    
-                    print(f'logits shape: {logits.shape}, gt_obj shape: {gt_obj.shape}')
-                    
-                    # Приводим gt_obj к правильному формату для loss
-                    if gt_obj.dim() == 2:  # [H, W]
-                        target = gt_obj.unsqueeze(0)  # [1, H, W] 
-                    else:
-                        target = gt_obj
-                    
-                    # Убеждаемся что размеры логитов и таргета совпадают
-                    if logits.shape[-2:] != target.shape[-2:]:
-                        target = torch.nn.functional.interpolate(
-                            target.float().unsqueeze(0),
-                            size=logits.shape[-2:],
-                            mode='nearest'
-                        ).squeeze().long()
-                        if target.dim() == 2:
-                            target = target.unsqueeze(0)
-                    
-                    # Вычисляем object loss
-                    # ПРАВИЛЬНАЯ бинарная сегментация loss (скаляр)
-                    if dataset.num_classes == 2:
-                        # Для бинарной классификации используем BCEWithLogitsLoss
-                        logits_binary = logits[:, 1:2, :, :]  # Канал объекта [1,1,H,W]
-                        target_binary = (target > 0).float().unsqueeze(1)  # [1,1,H,W]
-                        pos_weight = (target_binary == 0).sum() / (target_binary.sum() + 1e-8)
-                        bce_loss = torch.nn.BCEWithLogitsLoss(reduction='mean', pos_weight=pos_weight)
-                        loss_obj = bce_loss(logits_binary, target_binary)
-                    else:
-                        # Для многоклассовой классификации используем CrossEntropyLoss
-                        loss_obj = cls_criterion(logits, target).mean()
-                    if dataset.num_classes > 1:
-                        loss_obj = loss_obj / torch.log(torch.tensor(float(dataset.num_classes), device=device))
-                    # DEBUG: проверяем содержимое                    
-                    # Убеждаемся что loss_obj скаляр
-                    if loss_obj.dim() > 0:
-                        loss_obj = loss_obj.mean()
-                    
-                    #print(f"Object loss: {float(loss_obj):.4f}")
-                    # loss_obj уже нормализован  # нормализация
-                    
-                    # #print(f'Object loss: {float(loss_obj):.4f}')  # Временно отключено
-                    
+                # Приводим objects к правильному формату
+                if objects.dim() == 3:  # [C, H, W]
+                    objects_input = objects.unsqueeze(0)  # [1, C, H, W]
                 else:
-                    print("Нет render_object в render_pkg")
-                    loss_obj = torch.tensor(0.0, device=device, requires_grad=True)
+                    objects_input = objects
+                    
+                # Классификация
+                logits = classifier(objects_input.float())
+                
+                # Проверяем размеры
+                if logits.dim() == 4:  # [B, num_classes, H, W]
+                    logits = logits.squeeze(0)  # [num_classes, H, W]
+                
+                # Приводим к одному размеру
+                if gt_obj.shape != logits.shape[1:]:
+                    # Ресайзим gt_obj к размерам logits
+                    gt_obj = F.interpolate(
+                        gt_obj.float().unsqueeze(0).unsqueeze(0), 
+                        size=logits.shape[1:], 
+                        mode='nearest'
+                    ).squeeze().long()
+                
+                # Вычисляем потерю
+                if logits.numel() > 0 and gt_obj.numel() > 0:
+                    loss_obj_3d = F.cross_entropy(
+                        logits.view(logits.shape[0], -1).transpose(0, 1),
+                        gt_obj.view(-1),
+                        ignore_index=255
+                    )
                     
             except Exception as e:
-                print(f"Ошибка в object segmentation на итерации {iteration}: {e}")
-                loss_obj = torch.tensor(0.0, device=device, requires_grad=True)
-        else:
-            print("Нет объектных масок для камеры")
-            loss_obj = torch.tensor(0.0, device=device, requires_grad=True)
-        
-        # 3D Regularization loss (как в оригинале)
-        loss_obj_3d = None
-        if (iteration % opt.reg3d_interval == 0 and 
-            hasattr(gaussians, '_objects_dc') and 
-            gaussians._objects_dc is not None and 
-            gaussians._objects_dc.numel() > 0):
-            try:
-                # 3D классификация Gaussians  
-                logits3d = classifier(gaussians._objects_dc.permute(2,0,1))  # [num_classes, num_points, 1]
-                prob_obj3d = torch.softmax(logits3d, dim=0).squeeze().permute(1,0)  # [num_points, num_classes]
-                
-                # Используем 3D loss из utils
-                loss_obj_3d = loss_cls_3d(
-                    gaussians._xyz.squeeze().detach(), 
-                    prob_obj3d, 
-                    opt.reg3d_k, 
-                    opt.reg3d_lambda_val, 
-                    opt.reg3d_max_points, 
-                    opt.reg3d_sample_size
-                )
-                print(f'3D regularization loss: {loss_obj_3d.item():.4f}')
-            except Exception as e:
-                print(f"Ошибка в 3D regularization: {e}")
-                loss_obj_3d = torch.tensor(0.0, device=device, requires_grad=True)
+                print(f"Предупреждение: Ошибка в сегментации на итерации {iteration}: {e}")
+                loss_obj_3d = torch.tensor(0.0, device=device)
 
         # Общая потеря
-        # Общая потеря (Gaussian Grouping стиль)
-        if loss_obj_3d is not None:
-            # Полная потеря с SSIM, object loss и 3D regularization
-            loss = ((1.0 - opt.lambda_dssim) * Ll1 + 
-                   opt.lambda_dssim * (1.0 - ssim(image, gt_image)) + 
-                   loss_obj + loss_obj_3d)
-                    # print(f'Full loss: L1={Ll1.item():.4f}, Obj={float(loss_obj):.4f}, 3D={loss_obj_3d.item():.4f}')  # Временно отключено
-        else:
-            # Потеря без 3D regularization
-            loss = ((1.0 - opt.lambda_dssim) * Ll1 + 
-                   opt.lambda_dssim * (1.0 - ssim(image, gt_image)) + 
-                   loss_obj)
-                    # print(f'Loss: L1={Ll1.item():.4f}, Obj={float(loss_obj):.4f}')  # Временно отключено
+        loss = Ll1 + 0.1 * loss_obj_3d
 
         loss.backward()
 
@@ -377,17 +286,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                           testing_iterations, scene, render, (pipe, background), loss_obj_3d, use_wandb)
             
             if iteration in saving_iterations:
-                print(f"\n[ITER {iteration}] Сохранение Gaussians и Классификатора")
-                
-                # Сохраняем Gaussians (point_cloud.ply)
+                print(f"\n[ITER {iteration}] Сохранение Gaussians")
                 scene.save(iteration)
                 
                 # Сохраняем классификатор
                 classifier_path = os.path.join(scene.model_path, f"point_cloud/iteration_{iteration}")
                 os.makedirs(classifier_path, exist_ok=True)
                 torch.save(classifier.state_dict(), os.path.join(classifier_path, 'classifier.pth'))
-                
-                print(f"✓ Модель сохранена в {classifier_path}")
 
             # Денсификация
             if iteration < opt.densify_until_iter:
@@ -413,16 +318,15 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 
                 if iteration % opt.opacity_reset_interval == 0 or \
                    (dataset.white_background and iteration == opt.densify_from_iter):
-                    print(f"⚠️  Пропущен reset_opacity на итерации {iteration} для стабильности")
-                    # gaussians.reset_opacity()  # Отключено для стабильности обучения
+                    gaussians.reset_opacity()
 
             # Шаг оптимизатора
             if iteration < opt.iterations:
                 gaussians.optimizer.step()
                 gaussians.optimizer.zero_grad(set_to_none=True)
                 
-                cls_optimizer.step()
-                cls_optimizer.zero_grad(set_to_none=True)
+                classifier_optimizer.step()
+                classifier_optimizer.zero_grad(set_to_none=True)
 
         torch.cuda.empty_cache()
 

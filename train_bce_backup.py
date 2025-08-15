@@ -156,7 +156,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
     torch.nn.init.xavier_uniform_(classifier.weight, gain=0.01)
     torch.nn.init.constant_(classifier.bias, 0.0)
     cls_criterion = torch.nn.CrossEntropyLoss(reduction='none')
-    cls_optimizer = torch.optim.Adam(classifier.parameters(), lr=5e-4)
+    cls_optimizer = torch.optim.Adam(classifier.parameters(), lr=1e-5)
     print(f"Классификатор создан: 1 -> {dataset.num_classes} классов")
     
     # Фон
@@ -295,7 +295,11 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                         loss_obj = cls_criterion(logits, target).mean()
                     if dataset.num_classes > 1:
                         loss_obj = loss_obj / torch.log(torch.tensor(float(dataset.num_classes), device=device))
-                    # DEBUG: проверяем содержимое                    
+                    # DEBUG: проверяем содержимое
+                    print(f"  logits_binary shape: {logits_binary.shape}, min/max: {logits_binary.min():.3f}/{logits_binary.max():.3f}")
+                    print(f"  target_binary shape: {target_binary.shape}, sum: {target_binary.sum():.0f}, mean: {target_binary.mean():.3f}")
+                    print(f"  BCEWithLogitsLoss result: {float(loss_obj):.6f}")
+                    
                     # Убеждаемся что loss_obj скаляр
                     if loss_obj.dim() > 0:
                         loss_obj = loss_obj.mean()
@@ -377,17 +381,13 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                           testing_iterations, scene, render, (pipe, background), loss_obj_3d, use_wandb)
             
             if iteration in saving_iterations:
-                print(f"\n[ITER {iteration}] Сохранение Gaussians и Классификатора")
-                
-                # Сохраняем Gaussians (point_cloud.ply)
-                scene.save(iteration)
+                print(f"\n[ITER {iteration}] Сохранение Checkpoint")
+                torch.save((gaussians.capture(), iteration), os.path.join(scene.model_path, f"chkpnt{iteration}.pth"))
                 
                 # Сохраняем классификатор
                 classifier_path = os.path.join(scene.model_path, f"point_cloud/iteration_{iteration}")
                 os.makedirs(classifier_path, exist_ok=True)
                 torch.save(classifier.state_dict(), os.path.join(classifier_path, 'classifier.pth'))
-                
-                print(f"✓ Модель сохранена в {classifier_path}")
 
             # Денсификация
             if iteration < opt.densify_until_iter:
@@ -413,8 +413,7 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                 
                 if iteration % opt.opacity_reset_interval == 0 or \
                    (dataset.white_background and iteration == opt.densify_from_iter):
-                    print(f"⚠️  Пропущен reset_opacity на итерации {iteration} для стабильности")
-                    # gaussians.reset_opacity()  # Отключено для стабильности обучения
+                    gaussians.reset_opacity()
 
             # Шаг оптимизатора
             if iteration < opt.iterations:

@@ -476,20 +476,20 @@ class GaussianModel:
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         # БЕЗОПАСНОСТЬ: Добавляем try-catch для стабильности
         try:
-            grads = self.xyz_gradient_accum / self.denom
-            grads[grads.isnan()] = 0.0
+        grads = self.xyz_gradient_accum / self.denom
+        grads[grads.isnan()] = 0.0
 
-            self.densify_and_clone(grads, max_grad, extent)
-            self.densify_and_split(grads, max_grad, extent)
+        self.densify_and_clone(grads, max_grad, extent)
+        self.densify_and_split(grads, max_grad, extent)
 
-            prune_mask = (self.get_opacity < min_opacity).squeeze()
-            if max_screen_size:
-                big_points_vs = self.max_radii2D > max_screen_size
-                big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
-                prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
-            self.prune_points(prune_mask)
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        if max_screen_size:
+            big_points_vs = self.max_radii2D > max_screen_size
+            big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
+            prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
+        self.prune_points(prune_mask)
 
-            torch.cuda.empty_cache()
+        torch.cuda.empty_cache()
         except Exception as e:
             print(f"⚠️  Ошибка в densify_and_prune: {e}")
             print("Пропускаем densification для стабильности")

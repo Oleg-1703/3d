@@ -377,17 +377,10 @@ def training(dataset, opt, pipe, testing_iterations, saving_iterations, checkpoi
                           testing_iterations, scene, render, (pipe, background), loss_obj_3d, use_wandb)
             
             if iteration in saving_iterations:
-                print(f"\n[ITER {iteration}] Сохранение Gaussians и Классификатора")
-                
-                # Сохраняем Gaussians (point_cloud.ply)
-                scene.save(iteration)
-                
-                # Сохраняем классификатор
+                print(f"\n[ITER {iteration}] Сохранение Checkpoint")
                 classifier_path = os.path.join(scene.model_path, f"point_cloud/iteration_{iteration}")
                 os.makedirs(classifier_path, exist_ok=True)
                 torch.save(classifier.state_dict(), os.path.join(classifier_path, 'classifier.pth'))
-                
-                print(f"✓ Модель сохранена в {classifier_path}")
 
             # Денсификация
             if iteration < opt.densify_until_iter:

@@ -131,3 +131,9 @@ def safe_state(silent):
     np.random.seed(0)
     torch.manual_seed(0)
     torch.cuda.set_device(torch.device("cuda:0"))
+
+def prepare_output_and_logger(args):
+    """Prepare output directories and logger"""
+    import os
+    os.makedirs(args.model_path, exist_ok=True)
+    print(f"Output folder: {args.model_path}")

@@ -310,29 +310,12 @@ class GaussianModel:
         for group in self.optimizer.param_groups:
             if group["name"] == name:
                 stored_state = self.optimizer.state.get(group['params'][0], None)
-                
-                # КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем что stored_state существует
-                if stored_state is not None:
-                    stored_state["exp_avg"] = torch.zeros_like(tensor)
-                    stored_state["exp_avg_sq"] = torch.zeros_like(tensor)
-                    del self.optimizer.state[group['params'][0]]
-                else:
-                    # Если состояние отсутствует, создаем новое
-                    print(f"⚠️  Создаем новое состояние оптимизатора для {name}")
+                stored_state["exp_avg"] = torch.zeros_like(tensor)
+                stored_state["exp_avg_sq"] = torch.zeros_like(tensor)
 
-                # Заменяем параметр
+                del self.optimizer.state[group['params'][0]]
                 group["params"][0] = nn.Parameter(tensor.requires_grad_(True))
-                
-                # Восстанавливаем или создаем состояние
-                if stored_state is not None:
-                    self.optimizer.state[group['params'][0]] = stored_state
-                else:
-                    # Инициализируем новое состояние (Adam оптимизатор)
-                    self.optimizer.state[group['params'][0]] = {
-                        'step': 0,
-                        'exp_avg': torch.zeros_like(tensor),
-                        'exp_avg_sq': torch.zeros_like(tensor)
-                    }
+                self.optimizer.state[group['params'][0]] = stored_state
 
                 optimizable_tensors[group["name"]] = group["params"][0]
         return optimizable_tensors
@@ -474,26 +457,20 @@ class GaussianModel:
         self.densification_postfix(new_xyz, new_features_dc, new_features_rest, new_opacities, new_scaling, new_rotation, new_objects_dc)
 
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
-        # БЕЗОПАСНОСТЬ: Добавляем try-catch для стабильности
-        try:
-            grads = self.xyz_gradient_accum / self.denom
-            grads[grads.isnan()] = 0.0
+        grads = self.xyz_gradient_accum / self.denom
+        grads[grads.isnan()] = 0.0
 
-            self.densify_and_clone(grads, max_grad, extent)
-            self.densify_and_split(grads, max_grad, extent)
+        self.densify_and_clone(grads, max_grad, extent)
+        self.densify_and_split(grads, max_grad, extent)
 
-            prune_mask = (self.get_opacity < min_opacity).squeeze()
-            if max_screen_size:
-                big_points_vs = self.max_radii2D > max_screen_size
-                big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
-                prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
-            self.prune_points(prune_mask)
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+        if max_screen_size:
+            big_points_vs = self.max_radii2D > max_screen_size
+            big_points_ws = self.get_scaling.max(dim=1).values > 0.1 * extent
+            prune_mask = torch.logical_or(torch.logical_or(prune_mask, big_points_vs), big_points_ws)
+        self.prune_points(prune_mask)
 
-            torch.cuda.empty_cache()
-        except Exception as e:
-            print(f"⚠️  Ошибка в densify_and_prune: {e}")
-            print("Пропускаем densification для стабильности")
-            return  # Безопасный выход
+        torch.cuda.empty_cache()
 
     def add_densification_stats(self, viewspace_point_tensor, update_filter):
         device = viewspace_point_tensor.device

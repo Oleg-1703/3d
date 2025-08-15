@@ -74,3 +74,5 @@ bfg.jar
 Tracking-Anything-with-DEVA/output_text_seg/
 
 bert-base-uncased/
+data/
+output/

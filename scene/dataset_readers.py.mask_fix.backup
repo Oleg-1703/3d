@@ -42,10 +42,6 @@ class SceneInfo(NamedTuple):
 
 def getNerfppNorm(cam_info):
     def get_center_and_diag(cam_centers):
-        if len(cam_centers) == 0:
-            print("⚠️ Пустой список центров камер")
-            return np.array([0.0, 0.0, 0.0]), 1.0
-            
         cam_centers = np.hstack(cam_centers)
         avg_cam_center = np.mean(cam_centers, axis=1, keepdims=True)
         center = avg_cam_center
@@ -53,31 +49,18 @@ def getNerfppNorm(cam_info):
         diagonal = np.max(dist)
         return center.flatten(), diagonal
 
-    if len(cam_info) == 0:
-        print("❌ getNerfppNorm: Нет камер для нормализации")
-        return {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
-
     cam_centers = []
 
     for cam in cam_info:
-        try:
-            W2C = getWorld2View2(cam.R, cam.T)
-            C2W = np.linalg.inv(W2C)
-            cam_centers.append(C2W[:3, 3:4])
-        except Exception as e:
-            print(f"⚠️ Ошибка обработки камеры {getattr(cam, 'image_name', 'unknown')}: {e}")
-            continue
-
-    if len(cam_centers) == 0:
-        print("❌ getNerfppNorm: Не удалось извлечь центры камер")
-        return {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
+        W2C = getWorld2View2(cam.R, cam.T)
+        C2W = np.linalg.inv(W2C)
+        cam_centers.append(C2W[:3, 3:4])
 
     center, diagonal = get_center_and_diag(cam_centers)
     radius = diagonal * 1.1
 
     translate = -center
 
-    print(f"✅ NeRF нормализация: {len(cam_centers)} камер, радиус={radius:.3f}")
     return {"translate": translate, "radius": radius}
 
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder, objects_folder):
@@ -174,7 +157,7 @@ def readColmapSceneInfo(path, images, eval, object_path, n_views=None, random_in
         cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
         cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
         reading_dir = "images" if images == None else images
-        object_dir = "object_mask" if object_path == None else object_path
+        object_dir = "objects" if object_path == None else object_path
         print("✓ Используем исправленную модель камеры из sparse_fixed/0/")
     except:
         try:
@@ -184,39 +167,24 @@ def readColmapSceneInfo(path, images, eval, object_path, n_views=None, random_in
             cam_extrinsics = read_extrinsics_binary(cameras_extrinsic_file)
             cam_intrinsics = read_intrinsics_binary(cameras_intrinsic_file)
             reading_dir = "images" if images == None else images
-            object_dir = "object_mask" if object_path == None else object_path
+            object_dir = "objects" if object_path == None else object_path
             print("⚠ Используем оригинальную модель камеры из sparse/0/")
         except:
             cam_extrinsics = read_extrinsics_text(os.path.join(path, "sparse/0", "images.txt"))
             cam_intrinsics = read_intrinsics_text(os.path.join(path, "sparse/0", "cameras.txt"))
             reading_dir = "images" if images == None else images
-            object_dir = "object_mask" if object_path == None else object_path
+            object_dir = "objects" if object_path == None else object_path
             print("✓ Используем текстовые файлы из sparse/0/")
 
     cam_infos_unsorted = readColmapCameras(cam_extrinsics=cam_extrinsics, cam_intrinsics=cam_intrinsics, images_folder=os.path.join(path, reading_dir), objects_folder=os.path.join(path, object_dir))
     cam_infos = sorted(cam_infos_unsorted.copy(), key = lambda x : x.image_name)
     
-    print(f"🔍 Всего загружено камер: {len(cam_infos)}")
-    for i, cam in enumerate(cam_infos[:3]):
-        print(f"  Камера {i}: {cam.image_name}")
-    
     if eval:
         train_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % 4 != 0]
         test_cam_infos = [c for idx, c in enumerate(cam_infos) if idx % 4 == 0]
-        print(f"📊 eval=True: train={len(train_cam_infos)}, test={len(test_cam_infos)}")
     else:
         train_cam_infos = cam_infos
         test_cam_infos = []
-        print(f"📊 eval=False: train={len(train_cam_infos)}, test={len(test_cam_infos)}")
-    
-    if len(train_cam_infos) == 0:
-        print("❌ КРИТИЧЕСКАЯ ОШИБКА: train_cam_infos пустой!")
-        print(f"   eval={eval}, len(cam_infos)={len(cam_infos)}")
-        if eval and len(cam_infos) > 0:
-            print("   Принудительно используем все камеры для обучения")
-            train_cam_infos = cam_infos
-        else:
-            raise RuntimeError("Нет камер для обучения")
 
     # Здесь можно добавить ограничение количества изображений
     if n_views is not None:
@@ -229,46 +197,35 @@ def readColmapSceneInfo(path, images, eval, object_path, n_views=None, random_in
         else:
             train_cam_infos = train_cam_infos[:n_views]
             
-    print(f"🔍 Вызываем getNerfppNorm с {len(train_cam_infos)} камерами")
-    if len(train_cam_infos) == 0:
-        print("❌ ОШИБКА: train_cam_infos пустой перед getNerfppNorm!")
-        nerf_normalization = {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
-    else:
-        print(f"🔍 Вызываем getNerfppNorm с {len(train_cam_infos)} камерами")
-        if len(train_cam_infos) == 0:
-            print("❌ ОШИБКА: train_cam_infos пустой перед getNerfppNorm!")
-            nerf_normalization = {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
-        else:
-            nerf_normalization = getNerfppNorm(train_cam_infos)
+    nerf_normalization = getNerfppNorm(train_cam_infos)
 
-        # Загружаем точечное облако
-        ply_path = os.path.join(path, "sparse_fixed/0/points3D.ply")
-        if not os.path.exists(ply_path):
-            ply_path = os.path.join(path, "sparse/0/points3D.ply")
-        if not os.path.exists(ply_path):
-            print("Конвертируем points3D.bin в .ply...")
-            try:
-                bin_path = os.path.join(path, "sparse_fixed/0/points3D.bin")
-                if not os.path.exists(bin_path):
-                    bin_path = os.path.join(path, "sparse/0/points3D.bin")
-                xyz, rgb, _ = read_points3D_binary(bin_path)
-            except:
-                txt_path = os.path.join(path, "sparse/0/points3D.txt")
-                xyz, rgb, _ = read_points3D_text(txt_path)
-            storePly(ply_path, xyz, rgb)
-
+    # Загружаем точечное облако
+    ply_path = os.path.join(path, "sparse_fixed/0/points3D.ply")
+    if not os.path.exists(ply_path):
+        ply_path = os.path.join(path, "sparse/0/points3D.ply")
+    if not os.path.exists(ply_path):
+        print("Конвертируем points3D.bin в .ply...")
         try:
-            pcd = fetchPly(ply_path)
+            bin_path = os.path.join(path, "sparse_fixed/0/points3D.bin")
+            if not os.path.exists(bin_path):
+                bin_path = os.path.join(path, "sparse/0/points3D.bin")
+            xyz, rgb, _ = read_points3D_binary(bin_path)
         except:
-            pcd = None
+            txt_path = os.path.join(path, "sparse/0/points3D.txt")
+            xyz, rgb, _ = read_points3D_text(txt_path)
+        storePly(ply_path, xyz, rgb)
 
-        scene_info = SceneInfo(point_cloud=pcd,
-                            train_cameras=train_cam_infos,
-                            test_cameras=test_cam_infos,
-                            nerf_normalization=nerf_normalization,
-                            ply_path=ply_path)
-        return scene_info
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
 
+    scene_info = SceneInfo(point_cloud=pcd,
+                          train_cameras=train_cam_infos,
+                          test_cameras=test_cam_infos,
+                          nerf_normalization=nerf_normalization,
+                          ply_path=ply_path)
+    return scene_info
 def readCamerasFromTransforms(path, transformsfile, white_background, extension=".png"):
     cam_infos = []
 
@@ -321,41 +278,31 @@ def readNerfSyntheticInfo(path, white_background, eval, extension=".png"):
         train_cam_infos.extend(test_cam_infos)
         test_cam_infos = []
 
-    print(f"🔍 Вызываем getNerfppNorm с {len(train_cam_infos)} камерами")
-    if len(train_cam_infos) == 0:
-        print("❌ ОШИБКА: train_cam_infos пустой перед getNerfppNorm!")
-        nerf_normalization = {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
-    else:
-        print(f"🔍 Вызываем getNerfppNorm с {len(train_cam_infos)} камерами")
-        if len(train_cam_infos) == 0:
-            print("❌ ОШИБКА: train_cam_infos пустой перед getNerfppNorm!")
-            nerf_normalization = {"translate": np.array([0.0, 0.0, 0.0]), "radius": 1.0}
-        else:
-            nerf_normalization = getNerfppNorm(train_cam_infos)
+    nerf_normalization = getNerfppNorm(train_cam_infos)
 
-        ply_path = os.path.join(path, "points3d.ply")
-        if not os.path.exists(ply_path):
-            # Since this data set has no colmap data, we start with random points
-            num_pts = 100_000
-            print(f"Generating random point cloud ({num_pts})...")
-            
-            # We create random points inside the bounds of the synthetic Blender scenes
-            xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3
-            shs = np.random.random((num_pts, 3)) / 255.0
-            pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3)))
+    ply_path = os.path.join(path, "points3d.ply")
+    if not os.path.exists(ply_path):
+        # Since this data set has no colmap data, we start with random points
+        num_pts = 100_000
+        print(f"Generating random point cloud ({num_pts})...")
+        
+        # We create random points inside the bounds of the synthetic Blender scenes
+        xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3
+        shs = np.random.random((num_pts, 3)) / 255.0
+        pcd = BasicPointCloud(points=xyz, colors=SH2RGB(shs), normals=np.zeros((num_pts, 3)))
 
-            storePly(ply_path, xyz, SH2RGB(shs) * 255)
-        try:
-            pcd = fetchPly(ply_path)
-        except:
-            pcd = None
+        storePly(ply_path, xyz, SH2RGB(shs) * 255)
+    try:
+        pcd = fetchPly(ply_path)
+    except:
+        pcd = None
 
-        scene_info = SceneInfo(point_cloud=pcd,
-                            train_cameras=train_cam_infos,
-                            test_cameras=test_cam_infos,
-                            nerf_normalization=nerf_normalization,
-                            ply_path=ply_path)
-        return scene_info
+    scene_info = SceneInfo(point_cloud=pcd,
+                           train_cameras=train_cam_infos,
+                           test_cameras=test_cam_infos,
+                           nerf_normalization=nerf_normalization,
+                           ply_path=ply_path)
+    return scene_info
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,

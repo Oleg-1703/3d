@@ -87,19 +87,11 @@ def loadCam(args, id, cam_info, resolution_scale):
                   objects=objects_tensor)
 
 def cameraList_from_camInfos(cam_infos, resolution_scale, args):
-    print(f"📸 cameraList_from_camInfos: получено {len(cam_infos)} cam_infos")
-    if len(cam_infos) == 0:
-        print("❌ КРИТИЧЕСКАЯ ОШИБКА: cam_infos пустой в cameraList_from_camInfos!")
-        return []
-
     camera_list = []
 
     for id, c in enumerate(cam_infos):
-        print(f"  Обрабатываем камеру {id}: {c.image_name}")
-
         camera_list.append(loadCam(args, id, c, resolution_scale))
 
-    print(f"✅ cameraList_from_camInfos: создано {len(camera_list)} камер")
     return camera_list
 
 def camera_to_JSON(id, camera : Camera):

@@ -69,23 +69,10 @@ class Scene:
         self.cameras_extent = scene_info.nerf_normalization["radius"]
 
         for resolution_scale in resolution_scales:
-            print(f"Loading Training Cameras (scale={resolution_scale})")
-            print(f"  scene_info.train_cameras: {len(scene_info.train_cameras)} элементов")
-            if len(scene_info.train_cameras) == 0:
-                print("❌ КРИТИЧЕСКАЯ ОШИБКА: scene_info.train_cameras пустой!")
-                raise RuntimeError("Нет камер для обучения в scene_info")
-            
+            print("Loading Training Cameras")
             self.train_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.train_cameras, resolution_scale, args)
-            print(f"  Создано train_cameras: {len(self.train_cameras[resolution_scale])} камер")
-            
-            print(f"Loading Test Cameras (scale={resolution_scale})")
-            print(f"  scene_info.test_cameras: {len(scene_info.test_cameras)} элементов")
+            print("Loading Test Cameras")
             self.test_cameras[resolution_scale] = cameraList_from_camInfos(scene_info.test_cameras, resolution_scale, args)
-            print(f"  Создано test_cameras: {len(self.test_cameras[resolution_scale])} камер")
-            
-            if len(self.train_cameras[resolution_scale]) == 0:
-                print("❌ КРИТИЧЕСКАЯ ОШИБКА: self.train_cameras пустой после cameraList_from_camInfos!")
-                raise RuntimeError("Камеры не загружены в Scene")
 
         if self.loaded_iter:
             if isinstance(self.loaded_iter,str):
@@ -106,14 +93,7 @@ class Scene:
         self.gaussians.save_ply(os.path.join(point_cloud_path, "point_cloud.ply"))
 
     def getTrainCameras(self, scale=1.0):
-        cameras = self.train_cameras[scale]
-        print(f"🎯 getTrainCameras(scale={scale}): возвращаем {len(cameras)} камер")
-        if len(cameras) == 0:
-            print("❌ КРИТИЧЕСКАЯ ОШИБКА: getTrainCameras возвращает пустой список!")
-            print(f"   Доступные масштабы: {list(self.train_cameras.keys())}")
-            for s, cams in self.train_cameras.items():
-                print(f"     scale {s}: {len(cams)} камер")
-        return cameras
+        return self.train_cameras[scale]
 
     def getTestCameras(self, scale=1.0):
         return self.test_cameras[scale]
